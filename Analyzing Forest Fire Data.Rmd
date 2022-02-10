@@ -1,0 +1,221 @@
+---
+title: "Analyzing Forest Fire Data"
+author: "Sofiane Ikkour"
+output: html_document
+---
+### **Context and Objective:**  
+Forest fires can create ecological problems and endanger human lives and property. In this project we're aiming at understanding when they occur and what causes them to better know how to manage them. Our focus will not be directed towards a particular type of modeling, but rather we'll focus on visualizing it using different visualization methods. Hence, we'll perform exploratory data analysis to better understand the data and any relationships that might be present in it.
+
+### **Dataset:**   
+The data we'll be working with is associated with a [scientific research paper](http://www3.dsi.uminho.pt/pcortez/fires.pdf) on predicting the occurrence of forest fires in Portugal using modeling techniques. 
+
+Here are the descriptions of the different variables in the dataset and the range of values for each variable taken from the paper:  
+1. X: X-axis spatial coordinate within the Montesinho park map: 1 to 9.
+2. Y: Y-axis spatial coordinate within the Montesinho park map: 2 to 9.
+3. month: Month of the year: 'jan' to 'dec'.
+4. day: Day of the week: 'mon' to 'sun'.
+5. FFMC: Fine Fuel Moisture Code index from the FWI system: 18.7 to 96.2.
+6. DMC: Duff Moisture Code index from the FWI system: 1.1 to 291.3.
+7. DC: Drought Code Index from the FWI system: 7.9 to 860.6.
+8. ISI: Initial Spread Index from the FWI system: 0.0 to 56.10.
+9. temp: Temperature in Celcius degrees: 2.2 to 33.3.
+10. RH: Relative humidity in percentage: 15.0 to 100.
+11. wind: Wind speed in km/h: 0.4 to 9.4.
+12. rain: Outside rain in mm/m2: 0.0 to 6.4.
+13. area: The burned area of the forest(in ha): 0.00 to 1090.84.
+
+The X and Y variables are coordinates of fire locations.
+The acronym FWI stands for "fire weather index", a method used by scientists to measure risk factors for forest fires. This [link](https://cwfis.cfs.nrcan.gc.ca/background/summary/fwi) gives more details about the FWI and the variables included in our dataset.
+
+**Set working directory and load dataset**
+```{r}
+# load the relevant libraries
+library(readr)
+library(dplyr)
+
+# set working directory
+setwd("C:/Users/Aylan/Documents/IT/DataQuest/R/Datasets")
+
+# read the dataset
+data <- read_csv("forestfires.csv", col_types = cols())
+
+# use glimpse() function to a have summary on the dataset
+glimpse(data)
+```
+**Insights:**  
+ - A single row represents the location of a forest fire and the date it started. It also gives some characteristics about the fire itself.  
+ - It seems that fire spread is lower with the presence of moisture and rain. so we might expect a relationship between the variables representing water and spread of fire.  
+
+**Exploratory data analysis:**  
+Before we dive into data analysis, we need to take a look at the date variables "month" and "day".
+```{r}
+# pull the month column
+print(data %>% pull(month) %>% unique)
+
+# pull the day column
+print(data %>% pull(day) %>% unique)
+```
+These variables are of character type and would automatically be sorted by alphabetical order if they stay in this format. What we need to do is to convert them into categorical variables and order them correctly. For the variable day we assume that Sunday is the first day of the week.
+```{r}
+# create a vector that contains the months of the year in the normal order
+month_order <- c("jan", "feb", "mar", "apr", "may", "jun", 
+                "jul", "aug", "sep", "oct", "nov", "dec")
+
+
+# convert the month column into categorical
+data$month <- factor(data$month, levels = month_order)
+
+# create a vector that contains days of the week. We assume Sunday is the first day of the week
+day_order <- c("sun", "mon", "tue", "wed", "thu", "fri", "sat")
+
+# convert the day column into categorical
+data$day <- factor(data$day, levels = day_order)
+
+# print the new type of the variables
+print(typeof(data$month))
+print(typeof(data$day))
+```
+One of the questions that can be asked from analyzing the dataset is which months and days of the week do forest fires happen the most? Obviously, the variables month and day can be used to answer this question. If we group the occurrences by month and day we can count the number of forest fires for each month and day which is helpful to have an idea of when the fires are most likely to happen. 
+After that we can use a visualization method to plot the data.
+```{r}
+# create a tibble that counts the number of forest fires for each month
+tibble_month <- data %>% 
+  group_by(month) %>%
+  summarize(fire_count_month = n())
+
+# display the rows
+head(tibble_month, 12)
+```
+```{r}
+# create a tibble that counts the number of forest fires by day of the week
+tibble_day <- data %>%
+  group_by(day) %>%
+  summarize(fire_count_day = n())
+
+# display the 7 rows
+head(tibble_day, 7)
+```
+```{r}
+# create a plot to visualize our results obtained in tibble_month graphically 
+library(ggplot2) # load the relevant library
+
+tibble_month %>% 
+  ggplot(aes(x = month, y = fire_count_month)) +
+  geom_col() +
+  labs(title = "Number of forest fires by month",
+       x = "Month",
+       y = "Number of forest fires occured"
+       )
+```
+```{r}
+# create a plot to visualize our results obtained in tibble_day graphically 
+tibble_day %>% 
+  ggplot(aes(x = day, y = fire_count_day)) +
+  geom_col() +
+  labs(
+    title = "Number of forest fires by day",
+    x = "Day",
+    y = "Number of forest fires occurred"
+  )
+```
+
+**Insights:**  
+ - Looking at the bar chart describing the number of forest fires by month, we can quickly infer that the majority of forest fires occur in the month of August and September. This makes sense since the month of August is in the summer season and we can speculate the same trend continued though the month of September.  
+  - When we count by day, the number of fires is highest on Sundays, followed by Fridays and Saturdays.  
+  
+As we can see, the number of fires vary a lot more by month than by day. In order to explore the temporal patterns of forest fires occurrence the bar charts reveal, we should look more closely at the variables that relate to these fires by month. The variables of interest here are: FFMC, DMC, DC, ISI, temp, RH, wind and rain. 
+We need to create some visualizations to see the relationship between month and these variables. 
+Below is the code:
+```{r}
+# before we create the visualization plot we need to calculate the average of each variable by month
+# so we're going to create a tibble that contains those averages
+tibble_month_avg <- data %>%
+  group_by(month) %>%
+  summarize(FFMC_avg = mean(FFMC),
+            DMC_avg = mean(DMC),
+            DC_avg = mean(DC),
+            ISI_avg = mean(ISI),
+            temp_avg = mean(temp),
+            RH_avg = mean(wind),
+            rain_avg = mean(rain))
+
+# display the rows
+head(tibble_month_avg, 12)
+```
+```{r}
+# plot a bar chart for each average variable
+FFMC_p <- ggplot(tibble_month_avg, aes(x = month, y = FFMC_avg)) +
+         geom_col() 
+DMC_p <- ggplot(tibble_month_avg, aes(x = month, y = DMC_avg)) +
+         geom_col() 
+DC_p <- ggplot(tibble_month_avg, aes(x = month, y = DC_avg)) +
+         geom_col() 
+ISI_p <- ggplot(tibble_month_avg, aes(x = month, y = ISI_avg)) +
+         geom_col() 
+temp_p <- ggplot(tibble_month_avg, aes(x = month, y = temp_avg)) +
+         geom_col() 
+RH_p <- ggplot(tibble_month_avg, aes(x = month, y = RH_avg)) +
+         geom_col() 
+rain_p <- ggplot(tibble_month_avg, aes(x = month, y = rain_avg)) +
+         geom_col() 
+
+# assemble the bar charts in a grid
+library(gridExtra) # load the relevant library
+grid.arrange(FFMC_p, DMC_p, DC_p, ISI_p, temp_p, RH_p, rain_p, nrow = 4)
+```
+
+**Observations:**  
+We can notice that the indicators DMC and DC taken by average are highest in the summer season. This indicates that the relative ease of ignition and the flammability of fine fuel and fuel consumption in in moderate duff layers favorites forest fires in summer seasons. In addition, forest fires are accompanied with high temperatures which makes sens. 
+
+Next, we'll investigate how severe the forest fires are. The variable area contains data on the number of hectares of forest that burned during the forest fire so the idea behind this variable is that worse fires burn larger areas. We'll use this variable as an indicator for the severity of forest fires. 
+We're interested in learning about the relationships between area burned by forest fires and the following variables: FFMC, DMC, DC, ISI, temp, RH, wind and rain.
+```{r}
+# pivot data from wide to long
+library(tidyr) # load the relevant library
+longer <- data %>%
+  pivot_longer(cols = c("FFMC", "DMC", "DC", "ISI", 
+                        "temp", "RH", "wind", "rain"),
+               names_to = "columns",
+               values_to = "value")
+
+# display the first few rows of longer
+head(longer)
+```
+```{r}
+# create a scatter plot to visualize the relationships between area and the mentioned variables
+ggplot(longer, aes(x = value, y = area)) +
+  geom_point() +
+  facet_wrap(vars(columns), scale = "free_x") +
+  labs(
+    title = "Severity of forest fires",
+    x = "Variable values",
+    y = "Area burned (hectare)"
+  )
+```
+
+**Discussion:**  
+On the other hand, we can also notice that most points fall at the bottom of the histogram which makes interpreting the results for the other variables difficult. The reason for that can be understood by the histogram below:
+```{r}
+# plot a histogram for the area variable
+ggplot(data, aes(x = area)) +
+  geom_histogram()
+```
+
+As we can the variable area contains many outliers which explains the way the relationships are represented in the scatter plots. Most of area values fall under 300. If we filter our data by area and take only values of area under 300 we may have better visualizations on our scatter plots
+```{r}
+# create a scatter plot after filtering the area variable
+longer %>%
+  filter(area < 300) %>%
+  ggplot(aes(x = value, y = area)) +
+  geom_point() +
+  facet_wrap(vars(columns), scale = "free_x") +
+  labs(
+    title = "Severity of forest fires",
+    x = "Variable values",
+    y = "Area")
+```
+
+**Observations:**  
+ - We can see that there is a direct correlation between rain and area burned. Larger areas are burned when there is less or no rain at all.   
+ - The higher the FFMC the more and larger areas burned.  
+
