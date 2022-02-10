@@ -194,14 +194,14 @@ ggplot(longer, aes(x = value, y = area)) +
 ```
 
 **Discussion:**  
-On the other hand, we can also notice that most points fall at the bottom of the histogram which makes interpreting the results for the other variables difficult. The reason for that can be understood by the histogram below:
+We can notice that most points fall at the bottom of the histogram which makes interpreting the results for the other variables difficult. The reason for that can be understood by the histogram below:
 ```{r}
 # plot a histogram for the area variable
 ggplot(data, aes(x = area)) +
   geom_histogram()
 ```
 
-As we can the variable area contains many outliers which explains the way the relationships are represented in the scatter plots. Most of area values fall under 300. If we filter our data by area and take only values of area under 300 we may have better visualizations on our scatter plots
+As we can see the variable area contains many outliers which explains the way the relationships are represented in the scatter plots. Most of area values fall under 300. If we filter our data by area and take only values of under 300 we may have better visualizations on our scatter plots
 ```{r}
 # create a scatter plot after filtering the area variable
 longer %>%
